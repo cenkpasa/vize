@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Schengen Otonom Ajan v9.0 (Komuta Merkezi)</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        :root { --bg-color: #f7f7fb; --text-color: #212529; --card-bg: #fff; --card-shadow: 0 6px 18px rgba(0,0,0,0.06); --border-color: #dee2e6; --input-bg: #fff; --input-border: #ced4da; --log-bg: #111; --log-color: #ddd; }
+        [data-theme="dark"] { --bg-color: #121212; --text-color: #e0e0e0; --card-bg: #1e1e1e; --card-shadow: 0 6px 18px rgba(0,0,0,0.2); --border-color: #444; --input-bg: #2a2a2a; --input-border: #555; --log-bg: #2a2a2a; --log-color: #ccc; --bs-body-color: var(--text-color); --bs-body-bg: var(--bg-color); --bs-tertiary-bg: #2a2a2a; }
+        body { background:var(--bg-color); color:var(--text-color); }
+        .card { box-shadow:var(--card-shadow); border:1px solid var(--border-color); background:var(--card-bg); }
+        .log-panel { height:450px; overflow-y:auto; background:var(--log-bg); color:var(--log-color); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; padding:10px; border-radius:8px; white-space: pre-wrap; }
+        .status-dot { width:10px; height:10px; border-radius:50%; display:inline-block; margin-right:6px; }
+        .status-running { background:#28a745; animation: pulse-green 2s infinite; }
+        @keyframes pulse-green { 0% { box-shadow: 0 0 0 0 rgba(40, 167, 69, 0.7); } 70% { box-shadow: 0 0 0 10px rgba(40, 167, 69, 0); } 100% { box-shadow: 0 0 0 0 rgba(40, 167, 69, 0); } }
+        .monos { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.9em; }
+    </style>
+</head>
+<body>
+<div class="container py-4">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h3 class="mb-0">Schengen Otonom Ajan v9.0</h3>
+        <div class="d-flex gap-2 align-items-center">
+             <div id="agentStatus" class="d-flex align-items-center">
+                <span class="status-dot" style="background:grey;"></span>
+                <span>Bağlantı bekleniyor...</span>
+            </div>
+            <div class="form-check form-switch"><input class="form-check-input" type="checkbox" role="switch" id="darkModeSwitch"><label class="form-check-label" for="darkModeSwitch">Karanlık Mod</label></div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-lg-7">
+             <div class="card mb-4">
+                <div class="card-body">
+                    <h5 class="card-title">Yeni Görev Ekle</h5>
+                     <form id="personForm" class="row g-3">
+                        <input type="hidden" name="id">
+                        <div class="col-md-4"><label class="form-label required">Ad Soyad</label><input type="text" class="form-control" name="fullName" required /></div>
+                        <div class="col-md-4"><label class="form-label required">Pasaport No</label><input type="text" class="form-control" name="passportNo" required /></div>
+                        <div class="col-md-4"><label class="form-label required">Portal</label><select class="form-select" name="portal" required><option value="idata">iDATA</option><option value="vfs">VFS Global</option></select></div>
+                        <div class="col-md-6"><label class="form-label required">Portal E-postası</label><input type="email" class="form-control" name="portalEmail" required /></div>
+                        <div class="col-md-6"><label class="form-label required">Portal Şifresi</label><input type="password" class="form-control" name="portalPassword" required /></div>
+                        <div class="col-12"><button type="submit" class="btn btn-primary">Görevi Ekle</button></div>
+                    </form>
+                </div>
+             </div>
+             <div class="card mb-4">
+                <div class="card-body">
+                    <h5 class="card-title">Görev Listesi</h5>
+                    <div class="table-responsive" style="max-height: 400px;">
+                        <table class="table table-sm align-middle monos">
+                            <thead><tr><th>#</th><th>Ad Soyad</th><th>Portal</th><th>Durum</th><th class="text-end">İşlemler</th></tr></thead>
+                            <tbody id="personTableBody"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-5">
+            <div class="card mb-4">
+                <div class="card-body">
+                     <h5 class="card-title">Ajan Kontrol Paneli</h5>
+                     <p class="text-muted small">Tüm görevleri backend'e göndererek otonom ajanı başlatın.</p>
+                     <div class="d-grid gap-2">
+                        <button id="startAgentBtn" class="btn btn-success">AJANI BAŞLAT</button>
+                        <button id="stopAgentBtn" class="btn btn-danger" disabled>AJANI DURDUR</button>
+                     </div>
+                </div>
+            </div>
+            <div class="card mb-4">
+                <div class="card-body"><h5 class="card-title">Canlı Log Kayıtları</h5><div id="logPanel" class="log-panel"></div></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="smsModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">SMS Doğrulama Kodu Gerekiyor!</h5>
+      </div>
+      <div class="modal-body">
+        <p id="smsModalText"></p>
+        <input type="text" class="form-control" id="smsCodeInput" placeholder="Telefona gelen kodu girin...">
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-primary" id="submitSmsBtn">Kodu Gönder</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+// v9.0 Komuta Merkezi Script'i
+document.addEventListener('DOMContentLoaded', () => {
+    const API_URL = 'http://localhost:3000';
+    const WS_URL = 'ws://localhost:3000';
+
+    let persons = [];
+    let smsModal;
+
+    const logPanel = document.getElementById('logPanel');
+    const startBtn = document.getElementById('startAgentBtn');
+    const stopBtn = document.getElementById('stopAgentBtn');
+    const agentStatusEl = document.getElementById('agentStatus');
+    const personForm = document.getElementById('personForm');
+    const personTableBody = document.getElementById('personTableBody');
+
+    function log(level, message) {
+        const colorClass = level === 'error' ? 'text-danger' : (level === 'warning' ? 'text-warning' : (level === 'success' ? 'text-success' : 'text-info'));
+        logPanel.innerHTML += `<div><span class="${colorClass}">[${new Date().toLocaleTimeString()}]</span> ${message}</div>`;
+        logPanel.scrollTop = logPanel.scrollHeight;
+    }
+
+    // WebSocket Bağlantısı
+    function connectWebSocket() {
+        const ws = new WebSocket(WS_URL);
+        ws.onopen = () => {
+            log('success', 'Operasyon Beyni ile canlı bağlantı kuruldu.');
+            agentStatusEl.innerHTML = `<span class="status-dot status-running"></span><span>Bağlandı</span>`;
+        };
+        ws.onmessage = (event) => {
+            const data = JSON.parse(event.data);
+            if (data.type === 'log') {
+                log(data.level, data.message);
+                updateTaskStatusInUI(data.taskId, data.message);
+            } else if (data.type === 'sms_required') {
+                const person = persons.find(p => p.id === data.taskId);
+                document.getElementById('smsModalText').textContent = `${person.fullName} için SMS kodu gerekiyor.`;
+                smsModal = new bootstrap.Modal(document.getElementById('smsModal'));
+                smsModal.show();
+            }
+        };
+        ws.onclose = () => {
+            log('error', 'Operasyon Beyni ile bağlantı koptu! 5 saniyede yeniden denenecek...');
+            agentStatusEl.innerHTML = `<span class="status-dot bg-danger"></span><span>Bağlantı Koptu</span>`;
+            setTimeout(connectWebSocket, 5000);
+        };
+    }
+    
+    function updateTaskStatusInUI(taskId, message) {
+        if (!taskId) return;
+        const row = document.querySelector(`tr[data-id='${taskId}']`);
+        if(row) {
+            const statusCell = row.querySelector('.status-cell');
+            if (statusCell) {
+                 statusCell.innerHTML = `<span class="badge bg-info text-dark">${message.substring(0, 30)}...</span>`;
+            }
+        }
+    }
+
+    // Ajanı Başlat/Durdur
+    startBtn.addEventListener('click', async () => {
+        try {
+            const response = await fetch(`${API_URL}/start`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ tasks: persons })
+            });
+            if (!response.ok) throw new Error('Ajan başlatılamadı.');
+            startBtn.disabled = true;
+            stopBtn.disabled = false;
+        } catch (error) {
+            log('error', error.message);
+        }
+    });
+
+    stopBtn.addEventListener('click', async () => {
+        try {
+            await fetch(`${API_URL}/stop`, { method: 'POST' });
+            startBtn.disabled = false;
+            stopBtn.disabled = true;
+        } catch (error) {
+            log('error', error.message);
+        }
+    });
+
+    // SMS Kodunu Gönder
+    document.getElementById('submitSmsBtn').addEventListener('click', async () => {
+        const code = document.getElementById('smsCodeInput').value;
+        if (!code) return;
+        try {
+            const response = await fetch(`${API_URL}/submit-sms`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ code })
+            });
+            if (!response.ok) throw new Error("SMS kodu gönderilemedi.");
+            document.getElementById('smsCodeInput').value = '';
+            smsModal.hide();
+        } catch (error) {
+            log('error', 'SMS kodu gönderilemedi: ' + error.message);
+        }
+    });
+
+    // Görev Ekleme
+    personForm.addEventListener('submit', (e) => {
+        e.preventDefault();
+        const formData = new FormData(personForm);
+        const person = Object.fromEntries(formData.entries());
+        person.id = Date.now(); // Basit ID
+        person.status = 'çalışıyor'; // Varsayılan olarak çalışsın
+        persons.push(person);
+        renderPersons();
+        personForm.reset();
+    });
+
+    // Görevleri listele
+    function renderPersons() {
+        personTableBody.innerHTML = '';
+        persons.forEach(p => {
+            const tr = document.createElement('tr');
+            tr.dataset.id = p.id;
+            tr.innerHTML = `
+                <td>${p.id}</td>
+                <td>${p.fullName}</td>
+                <td>${p.portal.toUpperCase()}</td>
+                <td class="status-cell"><span class="badge bg-secondary">Beklemede</span></td>
+                <td class="text-end"><button class="btn btn-sm btn-danger" data-id="${p.id}">Sil</button></td>
+            `;
+            tr.querySelector('button').addEventListener('click', () => {
+                persons = persons.filter(person => person.id !== p.id);
+                renderPersons();
+            });
+            personTableBody.appendChild(tr);
+        });
+    }
+
+    // Tema
+    const darkModeSwitch = document.getElementById('darkModeSwitch');
+    darkModeSwitch.addEventListener('change', (e) => {
+        document.documentElement.setAttribute('data-theme', e.target.checked ? 'dark' : 'light');
+        localStorage.setItem('theme', e.target.checked ? 'dark' : 'light');
+    });
+
+    if (localStorage.getItem('theme') === 'dark') {
+        darkModeSwitch.checked = true;
+        document.documentElement.setAttribute('data-theme', 'dark');
+    }
+
+    // Başlatma
+    connectWebSocket();
+});
+</script>
+</body>
+</html>

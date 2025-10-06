@@ -1,0 +1,5 @@
+{
+  "name": "Schengen Visa Autonomous Agent (Command Center)",
+  "description": "A frontend command center for a fully autonomous agent. This interface manages tasks and communicates with a separate backend server that uses browser automation to log into visa portals, handle 2FA, and book appointments.",
+  "requestFramePermissions": []
+}
